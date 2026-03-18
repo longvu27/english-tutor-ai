@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Input, Button } from "antd";
 import { useChatStore } from "@/store/useChatStore";
 import ReactMarkdown from "react-markdown";
+import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
 
 export default function ChatBox() {
   const { chats, currentChatId, addMessage, updateLastMessage, mode } = useChatStore();
@@ -58,7 +59,7 @@ export default function ChatBox() {
             result += content;
             updateLastMessage(result);
           }
-        } catch {}
+        } catch { }
       }
     }
 
@@ -66,28 +67,23 @@ export default function ChatBox() {
   };
 
   return (
-    <div style={{ flex: 1, padding: 20 }}>
+    <div className="flex-1 flex flex-col p-5 h-full max-w-[900px] m-auto">
       {/* Messages */}
-      <div style={{ height: "70vh", overflowY: "auto" }}>
+      <div className="flex-1 overflow-y-auto space-y-2 pr-2">
         {messages.map((msg, i) => (
           <div
             key={i}
-            style={{
-              display: "flex",
-              justifyContent:
-                msg.role === "user" ? "flex-end" : "flex-start",
-              marginBottom: 10,
-            }}
+            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+              }`}
           >
             <div
-              style={{
-                background: msg.role === "user" ? "#1677ff" : "#f5f5f5",
-                color: msg.role === "user" ? "#fff" : "#000",
-                padding: "10px 14px",
-                borderRadius: 16,
-                maxWidth: "70%",
-                whiteSpace: "pre-wrap",
-              }}
+              className={`
+                px-4 py-2 rounded-2xl max-w-[70%] whitespace-pre-wrap
+                ${msg.role === "user"
+                  ? "bg-[#282a2c] text-white"
+                  : "text-[#e3e3e3]"
+                }
+              `}
             >
               <ReactMarkdown>{msg.content}</ReactMarkdown>
             </div>
@@ -97,25 +93,31 @@ export default function ChatBox() {
       </div>
 
       {/* Input */}
-      <Input.TextArea
-        rows={2}
-        value={input}
-        disabled={loading}
-        onChange={(e) => setInput(e.target.value)}
-        onPressEnter={(e) => {
-          e.preventDefault();
-          handleSend();
-        }}
-      />
+      <div className="mt-3 relative w-full">
+        <textarea
+          rows={3}
+          value={input}
+          disabled={loading}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          placeholder="Type your message..."
+          className="w-full bg-[#282a2c] text-white placeholder-white rounded-2xl p-3 pr-12 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
 
-      <Button
-        type="primary"
-        onClick={handleSend}
-        loading={loading}
-        style={{ marginTop: 10 }}
-      >
-        Send
-      </Button>
+        {/* Icon gửi nằm bên trong */}
+        <button
+          onClick={handleSend}
+          disabled={loading || !input.trim()}
+          className="absolute right-2 bottom-2 p-2 rounded-full bg-[#10a37f] hover:bg-[#0e8e6a] transition-colors disabled:opacity-50 flex items-center justify-center"
+        >
+          <PaperAirplaneIcon className={`h-5 w-5 text-white ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
     </div>
   );
 }
