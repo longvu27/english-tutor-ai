@@ -47,30 +47,32 @@ You are a friendly English tutor.
 
 
 export async function POST(req: Request) {
-  const { message, mode } = await req.json();
-  const SYSTEM_PROMPT = getSystemPrompt(mode);
+  try {
+    const { message, mode } = await req.json();
+    const systemPrompt = getSystemPrompt(mode);
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "llama-3.1-8b-instant",
-      temperature: 0.2,
-      max_tokens: 800, // 🔥 giới hạn output
-      stream: true,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: message },
-      ],
-    }),
-  });
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        temperature: 0.2,
+        max_tokens: 800,
+        stream: true,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message },
+        ],
+      }),
+    });
 
-  return new Response(response.body, {
-    headers: {
-      "Content-Type": "text/event-stream",
-    },
-  });
+    return new Response(response.body, {
+      headers: { "Content-Type": "text/event-stream" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: (err as Error).message }), { status: 500 });
+  }
 }
