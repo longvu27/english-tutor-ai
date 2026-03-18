@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+export type Mode = "grammar" | "chat" | "ielts";
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -8,39 +10,37 @@ interface Message {
 
 interface Chat {
   id: string;
+  title: string;
   messages: Message[];
 }
-export type Mode = "grammar" | "chat" | "ielts";
 
 interface ChatStore {
   chats: Chat[];
   currentChatId: string;
-  mode: "grammar" | "chat" | "ielts";
+  mode: Mode;
+
   setMode: (mode: Mode) => void;
   addChat: () => void;
   setCurrentChat: (id: string) => void;
   addMessage: (msg: Message) => void;
   updateLastMessage: (content: string) => void;
+  setTitle: (title: string) => void;
+  deleteChat: (id: string) => void;
 }
-const STORAGE_KEY = "chat-storage";
 
 export const useChatStore = create<ChatStore>()(
   persist(
     (set, get) => ({
-      chats: [
-        {
-          id: Date.now().toString(),
-          messages: [],
-        },
-      ],
+      chats: [],
       currentChatId: "",
       mode: "grammar",
 
       setMode: (mode) => set({ mode }),
 
       addChat: () => {
-        const newChat = {
-          id: Date.now().toString(),
+        const newChat: Chat = {
+          id: crypto.randomUUID(),
+          title: "",
           messages: [],
         };
 
@@ -55,11 +55,22 @@ export const useChatStore = create<ChatStore>()(
       addMessage: (msg) => {
         const { chats, currentChatId } = get();
 
-        const updated = chats.map((chat) =>
-          chat.id === currentChatId
-            ? { ...chat, messages: [...chat.messages, msg] }
-            : chat
-        );
+        const updated = chats.map((chat) => {
+          if (chat.id !== currentChatId) return chat;
+
+          const newMessages = [...chat.messages, msg];
+
+          const newTitle =
+            !chat.title && msg.role === "user"
+              ? msg.content.slice(0, 50)
+              : chat.title;
+
+          return {
+            ...chat,
+            messages: newMessages,
+            title: newTitle,
+          };
+        });
 
         set({ chats: updated });
       },
@@ -84,9 +95,29 @@ export const useChatStore = create<ChatStore>()(
 
         set({ chats: updated });
       },
+
+      setTitle: (title) => {
+        const { chats, currentChatId } = get();
+
+        const updated = chats.map((chat) =>
+          chat.id === currentChatId ? { ...chat, title } : chat
+        );
+
+        set({ chats: updated });
+      },
+      deleteChat: (id) => {
+        const { chats, currentChatId } = get();
+
+        const filtered = chats.filter((chat) => chat.id !== id);
+
+        const newCurrentId =
+          id === currentChatId ? filtered[0]?.id || "" : currentChatId;
+
+        set({ chats: filtered, currentChatId: newCurrentId });
+      },
     }),
     {
-      name: "chat-storage", // key trong localStorage
+      name: "chat-storage",
     }
   )
 );
