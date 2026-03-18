@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
 
 export default function ChatBox() {
-  const { chats, currentChatId, addMessage, updateLastMessage, mode } = useChatStore();
+  const { chats, currentChatId, addChat, addMessage, updateLastMessage, mode } = useChatStore();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -21,49 +21,67 @@ export default function ChatBox() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input) return;
+    if (!input.trim()) return;
+
+    const { chats, currentChatId, addChat, addMessage, updateLastMessage, mode } = useChatStore.getState();
+
+    let chat = chats.find((c) => c.id === currentChatId);
+
+    if (!chat) {
+      addChat();
+      const newCurrentId = useChatStore.getState().currentChatId;
+      chat = useChatStore.getState().chats.find((c) => c.id === newCurrentId);
+    }
+
+    if (!chat) return;
 
     addMessage({ role: "user", content: input });
     setInput("");
     setLoading(true);
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      body: JSON.stringify({ message: input, mode }),
-    });
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: input, mode }),
+      });
 
-    const reader = res.body?.getReader();
-    const decoder = new TextDecoder("utf-8");
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let result = "";
 
-    let result = "";
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-    while (true) {
-      const { done, value } = await reader!.read();
-      if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
 
-      const chunk = decoder.decode(value);
-      const lines = chunk.split("\n");
+          for (let line of lines) {
+            line = line.trim();
+            if (!line.startsWith("data:")) continue;
 
-      for (let line of lines) {
-        line = line.trim();
-        if (!line.startsWith("data:")) continue;
+            const jsonStr = line.replace("data: ", "").trim();
+            if (!jsonStr || jsonStr === "[DONE]") continue;
 
-        const jsonStr = line.replace("data: ", "");
-        if (jsonStr === "[DONE]") break;
-
-        try {
-          const json = JSON.parse(jsonStr);
-          const content = json.choices?.[0]?.delta?.content;
-
-          if (content) {
-            result += content;
-            updateLastMessage(result);
+            try {
+              const json = JSON.parse(jsonStr);
+              const content = json.choices?.[0]?.delta?.content;
+              if (content) {
+                result += content;
+                updateLastMessage(result);
+              }
+            } catch (err) {
+              console.warn("Skipped invalid JSON chunk:", jsonStr);
+            }
           }
-        } catch { }
+        }
       }
+    } catch (err) {
+      console.error("Error sending message:", err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
