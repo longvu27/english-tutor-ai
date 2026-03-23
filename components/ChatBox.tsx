@@ -5,11 +5,14 @@ import { Input, Button } from "antd";
 import { useChatStore } from "@/store/useChatStore";
 import ReactMarkdown from "react-markdown";
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
+import { createRecorder } from "@/utils/recorder"
 
 export default function ChatBox() {
   const { chats, currentChatId, addChat, addMessage, updateLastMessage, mode } = useChatStore();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const recorderRef = useRef<any>(null);
+  const [recording, setRecording] = useState(false);
 
   const chat = chats.find((c) => c.id === currentChatId);
   const messages = chat?.messages || [];
@@ -84,6 +87,34 @@ export default function ChatBox() {
     }
   };
 
+  const handleVoice = async () => {
+    if (!recording) {
+      recorderRef.current = createRecorder();
+      await recorderRef.current.start();
+      setRecording(true);
+    } else {
+      const blob = await recorderRef.current.stop();
+      setRecording(false);
+
+      const formData = new FormData();
+      formData.append("file", blob);
+
+      const res = await fetch("/api/speech", {
+        method: "POST",
+        body: formData,
+      });
+
+      const { text } = await res.json();
+
+      setInput(text);
+
+      // auto send 
+      setTimeout(() => {
+        handleSend();
+      }, 300);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col p-5 h-full max-w-[900px] m-auto">
       {/* Messages */}
@@ -134,6 +165,13 @@ export default function ChatBox() {
           className="absolute right-2 bottom-2 p-2 rounded-full bg-[#10a37f] hover:bg-[#0e8e6a] transition-colors disabled:opacity-50 flex items-center justify-center"
         >
           <PaperAirplaneIcon className={`h-5 w-5 text-white ${loading ? 'animate-spin' : ''}`} />
+        </button>
+        <button
+          onClick={handleVoice}
+          className={`absolute right-12 bottom-2 p-2 rounded-full 
+            ${recording ? "bg-red-500" : "bg-gray-500"} text-white`}
+        >
+          🎤
         </button>
       </div>
     </div>
